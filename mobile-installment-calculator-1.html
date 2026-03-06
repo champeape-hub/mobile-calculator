@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Mobile Installment Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;700&family=Dancing+Script:wght@700;800&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --canvas:#F4F1FA;--fg:#332F3A;--muted:#635F69;
+  --accent:#7C3AED;--green:#10B981;--amber:#F59E0B;--red:#EF4444;
+  --card:rgba(255,255,255,0.75);
+  --s-deep:30px 30px 60px #cdc6d9,-30px -30px 60px #fff,inset 10px 10px 20px rgba(139,92,246,.05),inset -10px -10px 20px rgba(255,255,255,.8);
+  --s-card:16px 16px 32px rgba(160,150,180,.2),-10px -10px 24px rgba(255,255,255,.9),inset 6px 6px 12px rgba(139,92,246,.03),inset -6px -6px 12px rgba(255,255,255,1);
+  --s-btn:10px 10px 20px rgba(139,92,246,.35),-6px -6px 14px rgba(255,255,255,.5),inset 3px 3px 6px rgba(255,255,255,.4),inset -3px -3px 6px rgba(0,0,0,.12);
+  --s-in:inset 8px 8px 16px #d9d4e3,inset -8px -8px 16px #fff;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--canvas);color:var(--fg);min-height:100vh;overflow-x:hidden;}
+body.urdu{direction:rtl;font-family:'Noto Nastaliq Urdu',serif;}
+body.urdu input,body.urdu select{direction:rtl;text-align:right;}
+
+/* BLOBS */
+.blobs{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;}
+.blob{position:absolute;border-radius:50%;filter:blur(72px);}
+.b1{width:55vw;height:55vw;background:#8B5CF6;opacity:.1;top:-12%;left:-8%;animation:bf1 11s ease-in-out infinite;}
+.b2{width:45vw;height:45vw;background:#EC4899;opacity:.09;top:25%;right:-12%;animation:bf2 13s ease-in-out infinite;}
+.b3{width:38vw;height:38vw;background:#0EA5E9;opacity:.08;bottom:-8%;left:28%;animation:bf1 9s ease-in-out infinite 2.5s;}
+.b4{width:30vw;height:30vw;background:#10B981;opacity:.07;top:55%;left:-5%;animation:bf2 15s ease-in-out infinite 1s;}
+@keyframes bf1{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-22px) rotate(3deg)}}
+@keyframes bf2{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-16px) rotate(-2deg)}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.025)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+
+/* LAYOUT */
+.wrap{position:relative;z-index:1;max-width:700px;margin:0 auto;padding:16px 14px 70px;}
+
+/* LANG TOGGLE */
+.lang-bar{display:flex;justify-content:flex-end;margin-bottom:14px;}
+body.urdu .lang-bar{justify-content:flex-start;}
+.lang-toggle{display:flex;background:var(--card);border-radius:50px;padding:4px;box-shadow:var(--s-card);gap:2px;}
+.lang-btn{padding:7px 16px;border-radius:50px;border:none;cursor:pointer;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;background:transparent;color:var(--muted);transition:all .25s ease;-webkit-tap-highlight-color:transparent;}
+.lang-btn.active{background:linear-gradient(135deg,#A78BFA,#7C3AED);color:#fff;box-shadow:var(--s-btn);}
+
+/* STEPS */
+.steps{display:flex;align-items:center;justify-content:center;margin-bottom:22px;}
+.step{display:flex;flex-direction:column;align-items:center;gap:4px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:700;color:var(--muted);flex:1;max-width:90px;}
+.step-dot{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;background:#EFEBF5;box-shadow:var(--s-in);color:var(--muted);transition:all .4s ease;}
+.step.done .step-dot,.step.active .step-dot{background:linear-gradient(135deg,#A78BFA,#7C3AED);box-shadow:var(--s-btn);color:#fff;}
+.step.active .step-dot{animation:breathe 3s ease-in-out infinite;}
+.step-line{flex:1;height:3px;background:#EFEBF5;box-shadow:inset 2px 2px 4px #d9d4e3,inset -2px -2px 4px #fff;border-radius:50px;margin-top:-18px;max-width:40px;transition:background .4s ease;}
+.step-line.done{background:linear-gradient(90deg,#A78BFA,#7C3AED);}
+
+/* HEADER */
+.header-card{background:var(--card);backdrop-filter:blur(24px);border-radius:44px;box-shadow:var(--s-deep);padding:28px 24px 24px;margin-bottom:20px;text-align:center;animation:slideUp .5s ease;}
+
+/* LOGO RING */
+.logo-section{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:16px;}
+.logo-ring{position:relative;width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,#A78BFA,#7C3AED);box-shadow:var(--s-btn);cursor:pointer;transition:all .3s ease;animation:breathe 7s ease-in-out infinite;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+.logo-ring:hover{transform:translateY(-4px) scale(1.06);}
+.logo-ring:active{transform:scale(.93);box-shadow:var(--s-in);}
+.logo-ring img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:none;position:absolute;inset:0;}
+.logo-ring .icon-wrap{display:flex;flex-direction:column;align-items:center;color:#fff;font-size:26px;gap:3px;z-index:1;}
+.logo-ring .icon-wrap small{font-size:9px;font-family:'Nunito',sans-serif;font-weight:700;opacity:.9;}
+.logo-hint{font-size:11px;color:var(--muted);font-family:'Nunito',sans-serif;font-weight:600;}
+
+/* SHOP NAME — Dancing Script */
+.shop-name-display{
+  font-family:'Dancing Script',cursive;
+  font-size:clamp(22px,5.5vw,36px);
+  font-weight:800;
+  background:linear-gradient(135deg,#7C3AED 0%,#DB2777 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  min-height:1.4em;line-height:1.2;
+}
+body.urdu .shop-name-display{font-family:'Noto Nastaliq Urdu',serif;font-size:clamp(18px,4.5vw,28px);}
+
+.fields-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+.fields-grid .span2{grid-column:1/-1;}
+
+/* CARD */
+.card{background:var(--card);backdrop-filter:blur(24px);border-radius:32px;box-shadow:var(--s-card);padding:24px 20px;margin-bottom:18px;transition:transform .4s ease,box-shadow .4s ease;animation:slideUp .5s ease;}
+.card:hover{transform:translateY(-3px);box-shadow:20px 20px 40px rgba(160,150,180,.25),-12px -12px 28px rgba(255,255,255,.95),inset 6px 6px 12px rgba(139,92,246,.04),inset -6px -6px 12px rgba(255,255,255,1);}
+.card-title{font-family:'Nunito',sans-serif;font-size:17px;font-weight:800;color:var(--accent);margin-bottom:16px;display:flex;align-items:center;gap:10px;}
+.ctag{width:34px;height:34px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+
+/* INPUTS */
+.ig{margin-bottom:13px;}
+.lbl{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;letter-spacing:.4px;text-transform:uppercase;}
+body.urdu .lbl{text-transform:none;letter-spacing:0;font-family:'Noto Nastaliq Urdu',serif;font-size:13px;}
+.err{font-size:11px;color:var(--red);font-weight:600;margin-top:4px;display:none;}
+.err.show{display:block;}
+input[type=text],input[type=number],input[type=tel]{width:100%;background:#EFEBF5;border:2px solid transparent;border-radius:18px;padding:13px 16px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;color:var(--fg);box-shadow:var(--s-in);outline:none;transition:all .3s ease;-webkit-appearance:none;appearance:none;}
+input:focus{background:#fff;box-shadow:0 0 0 3px rgba(124,58,237,.15),var(--s-card);border-color:rgba(124,58,237,.25);}
+input.invalid{border-color:var(--red)!important;box-shadow:0 0 0 3px rgba(239,68,68,.1)!important;}
+input::placeholder{color:#A09DB0;}
+
+/* PILLS */
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:5px;}
+.pill{padding:9px 16px;border-radius:50px;font-family:'Nunito',sans-serif;font-weight:700;font-size:13px;cursor:pointer;border:none;background:#EFEBF5;box-shadow:var(--s-in);color:var(--muted);transition:all .25s ease;-webkit-tap-highlight-color:transparent;}
+.pill:hover{transform:translateY(-2px);box-shadow:var(--s-card);}
+.pill.active{background:linear-gradient(135deg,#A78BFA,#7C3AED);color:#fff;box-shadow:var(--s-btn);transform:translateY(-2px);}
+.pill:active{transform:scale(.91);}
+.custom-in{margin-top:10px;display:none;}
+.custom-in.show{display:block;}
+
+/* TOGGLE */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;}
+.tl-main{font-size:14px;font-weight:600;}
+.tl-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.tog{position:relative;width:52px;height:27px;flex-shrink:0;}
+.tog input{opacity:0;width:0;height:0;position:absolute;}
+.tog-track{position:absolute;inset:0;border-radius:50px;cursor:pointer;background:#EFEBF5;box-shadow:var(--s-in);transition:all .35s ease;}
+.tog input:checked+.tog-track{background:linear-gradient(135deg,#A78BFA,#7C3AED);box-shadow:var(--s-btn);}
+.tog-track::after{content:'';position:absolute;top:4px;left:4px;width:19px;height:19px;background:#fff;border-radius:50%;box-shadow:2px 2px 5px rgba(0,0,0,.15);transition:transform .35s cubic-bezier(.34,1.56,.64,1);}
+.tog input:checked+.tog-track::after{transform:translateX(25px);}
+.markup-fields{display:none;margin-top:10px;padding-top:10px;border-top:1px solid rgba(124,58,237,.08);}
+.markup-fields.show{display:block;}
+
+/* MONTH */
+.month-box{background:linear-gradient(135deg,rgba(167,139,250,.12),rgba(124,58,237,.06));border-radius:24px;padding:18px 16px 14px;margin-top:6px;}
+.month-num{font-family:'Nunito',sans-serif;font-size:48px;font-weight:900;color:var(--accent);text-align:center;line-height:1;}
+.month-num span{font-size:16px;font-weight:700;color:var(--muted);margin-left:4px;}
+.month-quick{display:flex;justify-content:space-between;gap:5px;margin:10px 0;}
+.mq{flex:1;padding:7px 0;border-radius:50px;border:none;cursor:pointer;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;background:#EFEBF5;box-shadow:var(--s-in);color:var(--muted);transition:all .2s ease;-webkit-tap-highlight-color:transparent;}
+.mq:hover{transform:translateY(-1px);}
+.mq.active{background:linear-gradient(135deg,#A78BFA,#7C3AED);color:#fff;box-shadow:var(--s-btn);}
+.mq:active{transform:scale(.9);}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:7px;background:linear-gradient(90deg,var(--accent) var(--pct,21%),#EFEBF5 var(--pct,21%));border-radius:50px;box-shadow:var(--s-in);outline:none;cursor:pointer;margin-top:10px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;background:linear-gradient(135deg,#A78BFA,#7C3AED);border-radius:50%;box-shadow:var(--s-btn);cursor:pointer;transition:transform .2s;}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.2);}
+input[type=range]::-moz-range-thumb{width:26px;height:26px;border:none;background:linear-gradient(135deg,#A78BFA,#7C3AED);border-radius:50%;box-shadow:var(--s-btn);}
+
+/* CALC BTN */
+.calc-btn{width:100%;padding:17px;border-radius:22px;border:none;background:linear-gradient(135deg,#A78BFA,#7C3AED);color:#fff;font-family:'Nunito',sans-serif;font-size:18px;font-weight:900;letter-spacing:.3px;box-shadow:var(--s-btn);cursor:pointer;transition:all .25s ease;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent;}
+.calc-btn:hover{transform:translateY(-3px);box-shadow:14px 14px 28px rgba(139,92,246,.4),-8px -8px 18px rgba(255,255,255,.5),inset 3px 3px 6px rgba(255,255,255,.4),inset -3px -3px 6px rgba(0,0,0,.12);}
+.calc-btn:active{transform:scale(.92);box-shadow:var(--s-in);}
+.spinner{width:20px;height:20px;border:3px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none;}
+
+.div{height:2px;background:linear-gradient(90deg,transparent,rgba(124,58,237,.1),transparent);margin:13px 0;border-radius:50px;}
+
+/* RESULTS */
+.results{display:none;background:linear-gradient(145deg,rgba(167,139,250,.12),rgba(236,72,153,.06),rgba(14,165,233,.05));backdrop-filter:blur(24px);border-radius:40px;box-shadow:var(--s-deep);padding:28px 20px;margin-bottom:18px;}
+.results.show{display:block;animation:slideUp .5s cubic-bezier(.34,1.3,.64,1);}
+.res-title{font-family:'Nunito',sans-serif;font-size:20px;font-weight:900;color:var(--accent);text-align:center;margin-bottom:20px;}
+.orbs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;}
+.orb{background:var(--card);border-radius:24px;box-shadow:var(--s-card);padding:16px 12px;text-align:center;transition:all .3s ease;animation:breathe 7s ease-in-out infinite;}
+.orb:hover{transform:translateY(-3px) scale(1.03);}
+.orb.big{grid-column:1/-1;background:linear-gradient(135deg,#A78BFA,#7C3AED);animation:breathe 4s ease-in-out infinite;}
+.orb-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;}
+.orb.big .orb-lbl{color:rgba(255,255,255,.8);}
+.orb-val{font-family:'Nunito',sans-serif;font-size:22px;font-weight:900;color:var(--accent);}
+.orb.big .orb-val{color:#fff;font-size:30px;}
+.orb-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+.orb.big .orb-sub{color:rgba(255,255,255,.75);}
+.sched-wrap{background:var(--card);border-radius:22px;box-shadow:var(--s-card);overflow:hidden;margin-top:14px;}
+.sched-head{font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;color:var(--accent);padding:14px 16px 10px;border-bottom:2px solid rgba(124,58,237,.08);}
+.sched-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+table{width:100%;border-collapse:collapse;min-width:320px;}
+thead tr{background:rgba(124,58,237,.06);}
+th{padding:9px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;}
+td{padding:10px 12px;font-size:13px;font-weight:500;border-bottom:1px solid rgba(124,58,237,.05);color:var(--fg);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(124,58,237,.03);}
+.badge{display:inline-block;padding:3px 9px;border-radius:50px;font-size:10px;font-weight:700;background:rgba(16,185,129,.1);color:var(--green);}
+.pdf-btn{width:100%;padding:15px;margin-top:14px;border-radius:22px;border:2.5px solid rgba(124,58,237,.25);background:transparent;color:var(--accent);font-family:'Nunito',sans-serif;font-size:16px;font-weight:800;cursor:pointer;transition:all .25s ease;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent;}
+.pdf-btn:hover{background:rgba(124,58,237,.07);border-color:var(--accent);transform:translateY(-2px);box-shadow:var(--s-card);}
+.pdf-btn:active{transform:scale(.92);}
+
+/* CROP MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
+.modal-bg.show{display:flex;animation:fadeIn .3s ease;}
+.modal{background:#fff;border-radius:32px;padding:24px;width:min(380px,92vw);box-shadow:0 24px 60px rgba(0,0,0,.3);}
+.modal h3{font-family:'Nunito',sans-serif;font-size:18px;font-weight:800;color:var(--fg);margin-bottom:6px;text-align:center;}
+.modal p{font-size:12px;color:var(--muted);text-align:center;margin-bottom:16px;}
+.crop-wrap{position:relative;width:100%;aspect-ratio:1;background:#f0f0f0;border-radius:20px;overflow:hidden;touch-action:none;}
+.crop-wrap canvas{width:100%;height:100%;display:block;}
+.crop-circle{position:absolute;inset:15%;border:3px dashed rgba(124,58,237,.7);border-radius:50%;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,.45);}
+.crop-btns{display:flex;gap:10px;margin-top:14px;}
+.crop-btn{flex:1;padding:12px;border-radius:16px;border:none;font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;cursor:pointer;transition:all .2s ease;}
+.crop-cancel{background:#EFEBF5;color:var(--muted);box-shadow:var(--s-in);}
+.crop-cancel:hover{transform:translateY(-1px);}
+.crop-save{background:linear-gradient(135deg,#A78BFA,#7C3AED);color:#fff;box-shadow:var(--s-btn);}
+.crop-save:hover{transform:translateY(-2px);}
+.crop-save:active{transform:scale(.93);}
+.zoom-row{display:flex;align-items:center;gap:10px;margin-top:12px;}
+.zoom-row label{font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap;}
+
+/* TOAST */
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--fg);color:#fff;padding:11px 20px;border-radius:50px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;box-shadow:0 8px 28px rgba(0,0,0,.22);z-index:999;transition:transform .4s cubic-bezier(.34,1.3,.64,1),opacity .4s;opacity:0;white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+
+@media(max-width:480px){
+  .fields-grid{grid-template-columns:1fr;}
+  .header-card{padding:22px 16px;border-radius:36px;}
+  .card{padding:20px 16px;border-radius:28px;}
+  .month-num{font-size:40px;}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+</style>
+</head>
+<body>
+<div class="blobs">
+  <div class="blob b1"></div><div class="blob b2"></div>
+  <div class="blob b3"></div><div class="blob b4"></div>
+</div>
+
+<div class="wrap">
+
+  <!-- LANG TOGGLE -->
+  <div class="lang-bar">
+    <div class="lang-toggle">
+      <button class="lang-btn active" onclick="setLang('en',this)">English</button>
+      <button class="lang-btn" onclick="setLang('ur',this)">اردو</button>
+    </div>
+  </div>
+
+  <!-- STEPS -->
+  <div class="steps">
+    <div class="step active" id="s1"><div class="step-dot">1</div><span data-en="Shop" data-ur="دکان">Shop</span></div>
+    <div class="step-line" id="sl1"></div>
+    <div class="step" id="s2"><div class="step-dot">2</div><span data-en="Mobile" data-ur="موبائل">Mobile</span></div>
+    <div class="step-line" id="sl2"></div>
+    <div class="step" id="s3"><div class="step-dot">3</div><span data-en="Plan" data-ur="پلان">Plan</span></div>
+    <div class="step-line" id="sl3"></div>
+    <div class="step" id="s4"><div class="step-dot">4</div><span data-en="Result" data-ur="نتیجہ">Result</span></div>
+  </div>
+
+  <!-- HEADER -->
+  <div class="header-card">
+    <div class="logo-section">
+      <div class="logo-ring" id="logoRing" onclick="document.getElementById('logoInput').click()">
+        <div class="icon-wrap" id="iconWrap"><span>🏪</span><small data-en="Add Logo" data-ur="لوگو">Add Logo</small></div>
+        <img id="logoImg" alt="Logo">
+        <input type="file" id="logoInput" accept="image/*" style="display:none" onchange="openCrop(event)">
+      </div>
+      <span class="logo-hint" data-en="Tap to upload & crop logo" data-ur="لوگو اپلوڈ کریں">Tap to upload &amp; crop logo</span>
+    </div>
+    <div class="shop-name-display" id="shopDisplay" data-en-placeholder="Mobile Installment Calculator" data-ur-placeholder="موبائل قسط کیلکولیٹر">Mobile Installment Calculator</div>
+    <div class="fields-grid">
+      <div class="ig span2">
+        <label class="lbl" data-en="Shop Name" data-ur="دکان کا نام">Shop Name</label>
+        <input type="text" id="shopName" data-en-ph="e.g. Star Mobile Center" data-ur-ph="مثلاً: اسٹار موبائل سینٹر" placeholder="e.g. Star Mobile Center" oninput="updateDisplay()">
+      </div>
+      <div class="ig">
+        <label class="lbl" data-en="Address" data-ur="پتہ">Address</label>
+        <input type="text" id="shopAddr" data-en-ph="Shop address" data-ur-ph="دکان کا پتہ" placeholder="Shop address">
+      </div>
+      <div class="ig">
+        <label class="lbl" data-en="Phone" data-ur="فون">Phone</label>
+        <input type="tel" id="shopPhone" placeholder="+92 300 0000000">
+      </div>
+    </div>
+  </div>
+
+  <!-- MOBILE DETAILS -->
+  <div class="card">
+    <div class="card-title">
+      <div class="ctag" style="background:linear-gradient(135deg,#60A5FA,#3B82F6)">📱</div>
+      <span data-en="Mobile Details" data-ur="موبائل کی تفصیل">Mobile Details</span>
+    </div>
+    <div class="ig">
+      <label class="lbl" data-en="Mobile Model" data-ur="موبائل ماڈل">Mobile Model</label>
+      <input type="text" id="mobileModel" data-en-ph="e.g. Samsung Galaxy A55" data-ur-ph="مثلاً: سام سنگ A55" placeholder="e.g. Samsung Galaxy A55">
+    </div>
+    <div class="ig">
+      <label class="lbl" data-en="Mobile Price (PKR)" data-ur="موبائل قیمت (روپے)">Mobile Price (PKR)</label>
+      <input type="number" id="mobilePrice" data-en-ph="e.g. 65000" data-ur-ph="مثلاً: 65000" placeholder="e.g. 65000" min="0" oninput="clearErr('mobilePrice','priceErr')">
+      <div class="err" id="priceErr" data-en="Please enter a valid mobile price" data-ur="موبائل کی درست قیمت درج کریں">Please enter a valid mobile price</div>
+    </div>
+    <div class="ig">
+      <label class="lbl" data-en="Profit Margin" data-ur="منافع">Profit Margin</label>
+      <div class="pills">
+        <button class="pill active" onclick="setMargin(15,this)">15%</button>
+        <button class="pill" onclick="setMargin(20,this)">20%</button>
+        <button class="pill" onclick="setMargin(25,this)">25%</button>
+        <button class="pill" onclick="setMargin('c',this)" data-en="Custom" data-ur="اپنا">Custom</button>
+      </div>
+      <div class="custom-in" id="custIn">
+        <input type="number" id="custMargin" data-en-ph="Enter % e.g. 18" data-ur-ph="فیصد درج کریں" placeholder="Enter % e.g. 18" min="0.1" max="200" style="margin-top:8px" oninput="clearErr('custMargin','marginErr')">
+        <div class="err" id="marginErr" data-en="Enter a valid margin %" data-ur="درست فیصد درج کریں">Enter a valid margin %</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLAN -->
+  <div class="card">
+    <div class="card-title">
+      <div class="ctag" style="background:linear-gradient(135deg,#F472B6,#EC4899)">⚙️</div>
+      <span data-en="Installment Plan" data-ur="قسط پلان">Installment Plan</span>
+    </div>
+    <div class="ig">
+      <label class="lbl" data-en="Down Payment (PKR)" data-ur="پیشگی ادائیگی (روپے)">Down Payment (PKR)</label>
+      <input type="number" id="downPay" data-en-ph="0 (optional)" data-ur-ph="0 (اختیاری)" placeholder="0 (optional)" min="0" oninput="clearErr('downPay','downErr')">
+      <div class="err" id="downErr" data-en="Down payment cannot exceed total price" data-ur="پیشگی رقم کل قیمت سے زیادہ نہیں ہو سکتی">Down payment cannot exceed total price</div>
+    </div>
+    <div class="div"></div>
+    <div class="toggle-row">
+      <div>
+        <div class="tl-main" data-en="Add Markup / Interest" data-ur="مارک اپ / سود شامل کریں">Add Markup / Interest</div>
+        <div class="tl-sub" data-en="Monthly charge on remaining balance" data-ur="باقی رقم پر ماہانہ چارج">Monthly charge on remaining balance</div>
+      </div>
+      <label class="tog"><input type="checkbox" id="markupTog" onchange="toggleMarkup()"><div class="tog-track"></div></label>
+    </div>
+    <div class="markup-fields" id="markupFields">
+      <div class="ig">
+        <label class="lbl" data-en="Markup Rate (% per month)" data-ur="مارک اپ شرح (% فی مہینہ)">Markup Rate (% per month)</label>
+        <input type="number" id="markupRate" placeholder="e.g. 2.5" min="0.1" max="50" step="0.1" value="2" oninput="clearErr('markupRate','markupErr')">
+        <div class="err" id="markupErr" data-en="Enter a valid rate (0.1–50)" data-ur="درست شرح درج کریں">Enter a valid rate (0.1–50)</div>
+      </div>
+    </div>
+    <div class="div"></div>
+    <div class="ig">
+      <label class="lbl" data-en="Installment Duration" data-ur="قسط کی مدت">Installment Duration</label>
+      <div class="month-box">
+        <div class="month-num" id="monthNum">6 <span data-en="months" data-ur="ماہ">months</span></div>
+        <div class="month-quick">
+          <button class="mq" onclick="setMonths(3,this)">3</button>
+          <button class="mq active" onclick="setMonths(6,this)">6</button>
+          <button class="mq" onclick="setMonths(12,this)">12</button>
+          <button class="mq" onclick="setMonths(18,this)">18</button>
+          <button class="mq" onclick="setMonths(24,this)">24</button>
+        </div>
+        <input type="range" id="monthRange" min="1" max="24" value="6" oninput="onSlider(this)">
+      </div>
+    </div>
+  </div>
+
+  <!-- CALC -->
+  <button class="calc-btn" id="calcBtn" onclick="calculate()">
+    <span id="btnTxt" data-en="Calculate Installments" data-ur="قسط حساب کریں">Calculate Installments</span>
+    <div class="spinner" id="btnSpin"></div>
+  </button>
+
+  <!-- RESULTS -->
+  <div class="results" id="results">
+    <div class="res-title" data-en="Installment Breakdown" data-ur="قسط کی تفصیل">Installment Breakdown</div>
+    <div class="orbs">
+      <div class="orb big">
+        <div class="orb-lbl" data-en="Monthly Installment" data-ur="ماہانہ قسط">Monthly Installment</div>
+        <div class="orb-val" id="r-monthly">—</div>
+        <div class="orb-sub" id="r-msub">per month</div>
+      </div>
+      <div class="orb" style="animation-delay:.4s">
+        <div class="orb-lbl" data-en="Original Price" data-ur="اصل قیمت">Original Price</div>
+        <div class="orb-val" id="r-price" style="font-size:17px">—</div>
+        <div class="orb-sub" data-en="mobile cost" data-ur="موبائل قیمت">mobile cost</div>
+      </div>
+      <div class="orb" style="animation-delay:.8s">
+        <div class="orb-lbl" data-en="Profit Added" data-ur="منافع">Profit Added</div>
+        <div class="orb-val" id="r-profit" style="font-size:17px">—</div>
+        <div class="orb-sub" id="r-msub2">—</div>
+      </div>
+      <div class="orb" style="animation-delay:1.2s">
+        <div class="orb-lbl" data-en="Down Payment" data-ur="پیشگی">Down Payment</div>
+        <div class="orb-val" id="r-down" style="font-size:17px">—</div>
+        <div class="orb-sub" data-en="paid upfront" data-ur="پہلے ادا">paid upfront</div>
+      </div>
+      <div class="orb" style="animation-delay:1.6s">
+        <div class="orb-lbl" data-en="Markup/Interest" data-ur="مارک اپ">Markup/Interest</div>
+        <div class="orb-val" id="r-markup" style="font-size:17px">—</div>
+        <div class="orb-sub" id="r-msub3">—</div>
+      </div>
+      <div class="orb" style="background:linear-gradient(135deg,rgba(16,185,129,.1),rgba(16,185,129,.05));animation-delay:2s">
+        <div class="orb-lbl" data-en="Total Payable" data-ur="کل رقم">Total Payable</div>
+        <div class="orb-val" id="r-total" style="font-size:17px;color:var(--green)">—</div>
+        <div class="orb-sub" data-en="complete amount" data-ur="مکمل رقم">complete amount</div>
+      </div>
+    </div>
+    <div class="sched-wrap">
+      <div class="sched-head" data-en="Monthly Payment Schedule" data-ur="ماہانہ ادائیگی کا شیڈول">Monthly Payment Schedule</div>
+      <div class="sched-scroll">
+        <table>
+          <thead><tr>
+            <th data-en="#" data-ur="#">#</th>
+            <th data-en="Month" data-ur="مہینہ">Month</th>
+            <th data-en="Amount (PKR)" data-ur="رقم (روپے)">Amount (PKR)</th>
+            <th data-en="Status" data-ur="حیثیت">Status</th>
+          </tr></thead>
+          <tbody id="schedBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <button class="pdf-btn" onclick="downloadPDF()">
+      <span data-en="Download Invoice as PDF" data-ur="انوائس PDF ڈاؤن لوڈ کریں">Download Invoice as PDF</span>
+    </button>
+  </div>
+</div>
+
+<!-- CROP MODAL -->
+<div class="modal-bg" id="cropModal">
+  <div class="modal">
+    <h3 data-en="Crop Your Logo" data-ur="لوگو کراپ کریں">Crop Your Logo</h3>
+    <p data-en="Drag to reposition · Use slider to zoom" data-ur="پوزیشن بدلیں · زوم کریں">Drag to reposition · Use slider to zoom</p>
+    <div class="crop-wrap" id="cropWrap">
+      <canvas id="cropCanvas"></canvas>
+      <div class="crop-circle"></div>
+    </div>
+    <div class="zoom-row">
+      <label data-en="Zoom:" data-ur="زوم:">Zoom:</label>
+      <input type="range" id="zoomSlider" min="50" max="300" value="100" oninput="updateCrop()" style="box-shadow:none;background:#EFEBF5;margin-top:0;">
+    </div>
+    <div class="crop-btns">
+      <button class="crop-btn crop-cancel" onclick="closeCrop()" data-en="Cancel" data-ur="منسوخ">Cancel</button>
+      <button class="crop-btn crop-save" onclick="saveCrop()" data-en="Save Logo" data-ur="محفوظ کریں">Save Logo</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──
+let margin=15, customMode=false, months=6, logoData=null, calc=null, lang='en';
+let cropImg=null, cropX=0, cropY=0, cropDrag=false, dragSX=0, dragSY=0, dragOX=0, dragOY=0;
+
+// ── LANGUAGE ──
+function setLang(l, el){
+  lang=l;
+  document.querySelectorAll('.lang-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  document.body.classList.toggle('urdu', l==='ur');
+
+  // Update all data-en / data-ur elements
+  document.querySelectorAll('[data-en]').forEach(el=>{
+    if(el.tagName==='INPUT'){
+      const ph = el.getAttribute('data-'+l+'-ph');
+      if(ph) el.placeholder=ph;
+    } else {
+      el.textContent = el.getAttribute('data-'+l)||el.textContent;
+    }
+  });
+
+  // Placeholders on shop display
+  const disp = document.getElementById('shopDisplay');
+  const sn = document.getElementById('shopName').value.trim();
+  if(!sn) disp.textContent = disp.getAttribute('data-'+l+'-placeholder');
+
+  updateDisplay();
+}
+
+// ── LOGO & CROP ──
+let rawImgData=null;
+function openCrop(e){
+  const f=e.target.files[0]; if(!f) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    rawImgData=ev.target.result;
+    cropImg=new Image();
+    cropImg.onload=()=>{
+      cropX=0; cropY=0;
+      document.getElementById('zoomSlider').value=100;
+      drawCrop();
+      document.getElementById('cropModal').classList.add('show');
+    };
+    cropImg.src=rawImgData;
+  };
+  reader.readAsDataURL(f);
+  e.target.value='';
+}
+
+function drawCrop(){
+  const canvas=document.getElementById('cropCanvas');
+  const wrap=document.getElementById('cropWrap');
+  const size=wrap.offsetWidth;
+  canvas.width=size; canvas.height=size;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,size,size);
+  const zoom=parseInt(document.getElementById('zoomSlider').value)/100;
+  const iw=cropImg.width*zoom*(size/Math.max(cropImg.width,cropImg.height));
+  const ih=cropImg.height*zoom*(size/Math.max(cropImg.width,cropImg.height));
+  ctx.drawImage(cropImg, size/2-iw/2+cropX, size/2-ih/2+cropY, iw, ih);
+}
+
+function updateCrop(){ drawCrop(); }
+
+// Drag
+const cw=document.getElementById('cropWrap');
+cw.addEventListener('mousedown',e=>{cropDrag=true;dragSX=e.clientX;dragSY=e.clientY;dragOX=cropX;dragOY=cropY;});
+cw.addEventListener('mousemove',e=>{ if(!cropDrag) return; cropX=dragOX+(e.clientX-dragSX); cropY=dragOY+(e.clientY-dragSY); drawCrop(); });
+cw.addEventListener('mouseup',()=>cropDrag=false);
+cw.addEventListener('mouseleave',()=>cropDrag=false);
+cw.addEventListener('touchstart',e=>{const t=e.touches[0];cropDrag=true;dragSX=t.clientX;dragSY=t.clientY;dragOX=cropX;dragOY=cropY;},{passive:true});
+cw.addEventListener('touchmove',e=>{ if(!cropDrag) return; const t=e.touches[0]; cropX=dragOX+(t.clientX-dragSX); cropY=dragOY+(t.clientY-dragSY); drawCrop(); e.preventDefault(); },{passive:false});
+cw.addEventListener('touchend',()=>cropDrag=false);
+
+function saveCrop(){
+  const canvas=document.getElementById('cropCanvas');
+  const size=canvas.width;
+  const r=size*0.35; // circle radius ~35% of canvas
+  const cx=size/2, cy=size/2;
+  const out=document.createElement('canvas');
+  out.width=200; out.height=200;
+  const ctx=out.getContext('2d');
+  ctx.beginPath(); ctx.arc(100,100,100,0,Math.PI*2); ctx.clip();
+  // Scale from crop canvas to output
+  const scale=200/size;
+  ctx.drawImage(canvas,0,0,size,size,0,0,200,200);
+  logoData=out.toDataURL('image/png');
+  const img=document.getElementById('logoImg');
+  img.src=logoData; img.style.display='block';
+  document.getElementById('iconWrap').style.display='none';
+  closeCrop();
+  toast(lang==='ur'?'لوگو محفوظ ہو گیا':'Logo saved!');
+}
+
+function closeCrop(){
+  document.getElementById('cropModal').classList.remove('show');
+}
+
+function updateDisplay(){
+  const v=document.getElementById('shopName').value.trim();
+  const disp=document.getElementById('shopDisplay');
+  disp.textContent = v || disp.getAttribute('data-'+lang+'-placeholder');
+}
+
+// ── MARGIN ──
+function setMargin(v,el){
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  const ci=document.getElementById('custIn');
+  if(v==='c'){customMode=true;ci.classList.add('show');margin=null;}
+  else{customMode=false;ci.classList.remove('show');margin=v;}
+}
+
+// ── MARKUP TOGGLE ──
+function toggleMarkup(){
+  document.getElementById('markupFields').classList.toggle('show',document.getElementById('markupTog').checked);
+}
+
+// ── MONTHS ──
+function setMonths(v,el){
+  months=v;
+  document.getElementById('monthRange').value=v;
+  const span=document.querySelector('.month-num span');
+  document.getElementById('monthNum').innerHTML=`${v} <span data-en="months" data-ur="ماہ">${span?span.getAttribute('data-'+lang):'months'}</span>`;
+  document.querySelectorAll('.mq').forEach(b=>b.classList.toggle('active',parseInt(b.textContent)==v));
+  updateSlider(v);
+}
+function onSlider(el){
+  const v=parseInt(el.value); months=v;
+  const lbl=lang==='ur'?'ماہ':'months';
+  document.getElementById('monthNum').innerHTML=`${v} <span data-en="months" data-ur="ماہ">${lbl}</span>`;
+  document.querySelectorAll('.mq').forEach(b=>b.classList.toggle('active',parseInt(b.textContent)==v));
+  updateSlider(v);
+}
+function updateSlider(v){ document.getElementById('monthRange').style.setProperty('--pct',((v-1)/23*100).toFixed(1)+'%'); }
+
+// ── ERRORS ──
+function clearErr(iid,eid){ document.getElementById(iid).classList.remove('invalid'); document.getElementById(eid).classList.remove('show'); }
+function showErr(iid,eid){ document.getElementById(iid).classList.add('invalid'); document.getElementById(eid).classList.add('show'); }
+
+// ── TOAST ──
+function toast(msg,dur=2800){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),dur); }
+
+// ── STEPS ──
+function activateStep(n){
+  for(let i=1;i<=4;i++){
+    const s=document.getElementById('s'+i); s.classList.remove('active','done');
+    if(i<n){ s.classList.add('done'); const l=document.getElementById('sl'+i); if(l) l.classList.add('done'); }
+  }
+  document.getElementById('s'+n).classList.add('active');
+}
+
+// ── FORMAT ──
+function fmt(n){ return 'Rs. '+Math.round(n).toLocaleString('en-US'); }
+
+// ── CALCULATE ──
+function calculate(){
+  let ok=true;
+  const price=parseFloat(document.getElementById('mobilePrice').value);
+  if(!price||price<=0){showErr('mobilePrice','priceErr');ok=false;}else clearErr('mobilePrice','priceErr');
+  let m=margin;
+  if(customMode){ m=parseFloat(document.getElementById('custMargin').value); if(!m||m<=0){showErr('custMargin','marginErr');ok=false;}else clearErr('custMargin','marginErr'); }
+  const down=parseFloat(document.getElementById('downPay').value)||0;
+  if(down<0){showErr('downPay','downErr');ok=false;}else clearErr('downPay','downErr');
+  const markupOn=document.getElementById('markupTog').checked;
+  const markupRate=parseFloat(document.getElementById('markupRate').value)||0;
+  if(markupOn&&(markupRate<=0||markupRate>50)){showErr('markupRate','markupErr');ok=false;}else clearErr('markupRate','markupErr');
+  if(!ok){toast(lang==='ur'?'پہلے غلطیاں درست کریں':'Fix the errors first');return;}
+
+  document.getElementById('btnTxt').style.display='none';
+  document.getElementById('btnSpin').style.display='block';
+  document.getElementById('calcBtn').disabled=true;
+
+  setTimeout(()=>{
+    const profit=price*(m/100);
+    const withProfit=price+profit;
+    if(down>=withProfit){
+      toast(lang==='ur'?'پیشگی رقم کافی ہے، قسط کی ضرورت نہیں':'Down payment covers full amount!');
+      document.getElementById('btnTxt').style.display='inline';
+      document.getElementById('btnSpin').style.display='none';
+      document.getElementById('calcBtn').disabled=false;
+      return;
+    }
+    const remaining=withProfit-down;
+    let totalMarkup=0, monthly=remaining/months;
+    if(markupOn&&markupRate>0){totalMarkup=remaining*(markupRate/100)*months; monthly=(remaining+totalMarkup)/months;}
+    const total=down+(monthly*months);
+    calc={price,profit,withProfit,down,months,monthly,totalMarkup,total,margin:m,markupRate,markupOn};
+
+    document.getElementById('r-price').textContent=fmt(price);
+    document.getElementById('r-profit').textContent=fmt(profit);
+    document.getElementById('r-msub2').textContent=m+'% margin';
+    document.getElementById('r-down').textContent=fmt(down);
+    document.getElementById('r-markup').textContent=markupOn?fmt(totalMarkup):(lang==='ur'?'کوئی نہیں':'None');
+    document.getElementById('r-msub3').textContent=markupOn?markupRate+'%/month':(lang==='ur'?'غیر فعال':'disabled');
+    document.getElementById('r-total').textContent=fmt(total);
+    document.getElementById('r-monthly').textContent=fmt(monthly);
+    document.getElementById('r-msub').textContent=(lang==='ur'?'فی مہینہ ':'for ')+months+(lang==='ur'?' ماہ':' months');
+
+    const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const MNU=['جنوری','فروری','مارچ','اپریل','مئی','جون','جولائی','اگست','ستمبر','اکتوبر','نومبر','دسمبر'];
+    const now=new Date(); let rows='';
+    const pendingLabel=lang==='ur'?'باقی':'Pending';
+    for(let i=1;i<=months;i++){
+      const d=new Date(now.getFullYear(),now.getMonth()+i,1);
+      const mLabel=lang==='ur'?MNU[d.getMonth()]+' '+d.getFullYear():MN[d.getMonth()]+' '+d.getFullYear();
+      rows+=`<tr><td><strong>${i}</strong></td><td>${mLabel}</td><td><strong>${fmt(monthly)}</strong></td><td><span class="badge">${pendingLabel}</span></td></tr>`;
+    }
+    document.getElementById('schedBody').innerHTML=rows;
+
+    const res=document.getElementById('results');
+    res.classList.add('show');
+    setTimeout(()=>res.scrollIntoView({behavior:'smooth',block:'start'}),150);
+    activateStep(4);
+    toast(lang==='ur'?'حساب مکمل ہو گیا!':'Calculation complete!');
+    document.getElementById('btnTxt').style.display='inline';
+    document.getElementById('btnSpin').style.display='none';
+    document.getElementById('calcBtn').disabled=false;
+  },700);
+}
+
+// ── PDF ──
+function downloadPDF(){
+  if(!calc){toast(lang==='ur'?'پہلے حساب کریں':'Calculate first!');return;}
+  toast(lang==='ur'?'PDF بن رہی ہے...':'Generating PDF...');
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const PW=210,MG=16; let y=0;
+
+  // ── HEADER: two-zone design ──
+  // Left zone bg (shop info)
+  doc.setFillColor(124,58,237);
+  doc.rect(0,0,PW*0.6,58,'F');
+  // Right zone bg (invoice info) — slightly darker
+  doc.setFillColor(88,28,135);
+  doc.rect(PW*0.6,0,PW*0.4,58,'F');
+  // Decorative circle accent
+  doc.setFillColor(167,139,250);
+  doc.circle(PW*0.6,58,22,'F');
+
+  // Logo circle with white border
+  doc.setFillColor(255,255,255);
+  doc.circle(MG+15,26,16,'F');
+  if(logoData){
+    try{ doc.addImage(logoData,'PNG',MG+1,11,28,28,'','FAST'); }
+    catch(e){ doc.setTextColor(124,58,237);doc.setFontSize(16);doc.setFont('helvetica','bold');doc.text('M',MG+11,30); }
+  } else {
+    doc.setTextColor(124,58,237);doc.setFontSize(16);doc.setFont('helvetica','bold');doc.text('M',MG+11,30);
+  }
+
+  // Shop name & details
+  const sn=document.getElementById('shopName').value||'Mobile Shop';
+  const sa=document.getElementById('shopAddr').value||'';
+  const sp=document.getElementById('shopPhone').value||'';
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(13);doc.setFont('helvetica','bold');
+  doc.text(sn.substring(0,28),MG+36,20);
+  doc.setFontSize(8);doc.setFont('helvetica','normal');
+  if(sa) doc.text(sa.substring(0,36),MG+36,28);
+  if(sp) doc.text(sp.substring(0,20),MG+36,35);
+  // Small tagline
+  doc.setFontSize(7);doc.setTextColor(196,181,253);
+  doc.text('Mobile Installment Services',MG+36,43);
+
+  // Right zone: Invoice details
+  const invNo='INV-'+Math.floor(10000+Math.random()*90000);
+  const dt=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(16);doc.setFont('helvetica','bold');
+  doc.text('INVOICE',PW-MG-2,20,{align:'right'});
+  doc.setFontSize(9);doc.setFont('helvetica','normal');
+  doc.text(invNo,PW-MG-2,29,{align:'right'});
+  doc.setFontSize(8);
+  doc.text(dt,PW-MG-2,37,{align:'right'});
+  doc.setFontSize(7);doc.setTextColor(196,181,253);
+  doc.text('Date of Issue',PW-MG-2,44,{align:'right'});
+
+  y=66;
+
+  // ── MOBILE INFO BOX ──
+  const model=document.getElementById('mobileModel').value||'Mobile Device';
+  doc.setFillColor(245,243,255);
+  doc.roundedRect(MG,y,PW-MG*2,24,3,3,'F');
+  // Left accent bar
+  doc.setFillColor(124,58,237);
+  doc.roundedRect(MG,y,4,24,2,2,'F');
+  doc.setTextColor(124,58,237);doc.setFontSize(11);doc.setFont('helvetica','bold');
+  doc.text(model.substring(0,36),MG+8,y+9);
+  doc.setTextColor(99,95,105);doc.setFontSize(8);doc.setFont('helvetica','normal');
+  doc.text('Price: Rs.'+Math.round(calc.price).toLocaleString(),MG+8,y+18);
+  doc.text('Margin: '+calc.margin+'%',MG+72,y+18);
+  doc.text('Duration: '+calc.months+' Months',MG+116,y+18);
+  y+=32;
+
+  // ── SUMMARY TABLE ──
+  // Section label
+  doc.setTextColor(124,58,237);doc.setFontSize(8);doc.setFont('helvetica','bold');
+  doc.text('PAYMENT SUMMARY',MG,y+4);
+  y+=8;
+
+  const rows=[
+    ['Mobile Price',             'Rs.'+Math.round(calc.price).toLocaleString()],
+    ['Profit ('+calc.margin+'%)','Rs.'+Math.round(calc.profit).toLocaleString()],
+    ['Price with Profit',        'Rs.'+Math.round(calc.withProfit).toLocaleString()],
+    ['Down Payment',             'Rs.'+Math.round(calc.down).toLocaleString()],
+    ['Remaining Balance',        'Rs.'+Math.round(calc.withProfit-calc.down).toLocaleString()],
+    ['Markup / Interest',        calc.markupOn?'Rs.'+Math.round(calc.totalMarkup).toLocaleString()+' ('+calc.markupRate+'%/mo)':'None'],
+    ['Duration',                 calc.months+' Months'],
+  ];
+
+  // Table header
+  doc.setFillColor(124,58,237);
+  doc.roundedRect(MG,y,PW-MG*2,8,2,2,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(8.5);doc.setFont('helvetica','bold');
+  doc.text('Description',MG+5,y+5.5);
+  doc.text('Amount',PW-MG-4,y+5.5,{align:'right'});
+  y+=9;
+
+  rows.forEach((r,i)=>{
+    doc.setFillColor(i%2===0?248:255,i%2===0?246:255,255);
+    doc.rect(MG,y-0.5,PW-MG*2,8.5,'F');
+    doc.setTextColor(51,47,58);doc.setFontSize(8.5);doc.setFont('helvetica','normal');
+    doc.text(r[0],MG+5,y+5.5);
+    doc.text(r[1],PW-MG-4,y+5.5,{align:'right'});
+    y+=9;
+  });
+
+  // Total row — highlighted
+  doc.setFillColor(124,58,237);
+  doc.roundedRect(MG,y-0.5,PW-MG*2,11,2,2,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(10);doc.setFont('helvetica','bold');
+  doc.text('TOTAL PAYABLE',MG+5,y+7);
+  doc.text('Rs.'+Math.round(calc.total).toLocaleString(),PW-MG-4,y+7,{align:'right'});
+  y+=14;
+
+  // Monthly installment highlight box
+  doc.setFillColor(240,253,244);
+  doc.roundedRect(MG,y,PW-MG*2,14,3,3,'F');
+  doc.setFillColor(16,185,129);doc.roundedRect(MG,y,4,14,2,2,'F');
+  doc.setTextColor(16,185,129);doc.setFontSize(9);doc.setFont('helvetica','bold');
+  doc.text('MONTHLY INSTALLMENT',MG+8,y+6);
+  doc.setFontSize(12);
+  doc.text('Rs.'+Math.round(calc.monthly).toLocaleString()+' x '+calc.months+' months',MG+8,y+12);
+  y+=22;
+
+  // ── SCHEDULE ──
+  const rH=7.5;
+  if(y+14+calc.months*rH>278){doc.addPage();y=15;}
+
+  doc.setTextColor(124,58,237);doc.setFontSize(8);doc.setFont('helvetica','bold');
+  doc.text('PAYMENT SCHEDULE',MG,y+4);
+  y+=8;
+
+  doc.setFillColor(124,58,237);
+  doc.roundedRect(MG,y,PW-MG*2,8,2,2,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(8.5);doc.setFont('helvetica','bold');
+  doc.text('#',MG+4,y+5.5);
+  doc.text('Due Month',MG+14,y+5.5);
+  doc.text('Amount (PKR)',MG+75,y+5.5);
+  doc.text('Status',PW-MG-4,y+5.5,{align:'right'});
+  y+=9;
+
+  const MNS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const nd=new Date();
+  for(let i=1;i<=calc.months;i++){
+    if(y+rH>285){doc.addPage();y=15;}
+    const dd=new Date(nd.getFullYear(),nd.getMonth()+i,1);
+    doc.setFillColor(i%2===0?248:255,i%2===0?246:255,255);
+    doc.rect(MG,y-0.5,PW-MG*2,rH,'F');
+    doc.setTextColor(51,47,58);doc.setFontSize(8);doc.setFont('helvetica','normal');
+    doc.text(String(i),MG+4,y+4.5);
+    doc.text(MNS[dd.getMonth()]+' '+dd.getFullYear(),MG+11,y+4.5);
+    doc.text('Rs.'+Math.round(calc.monthly).toLocaleString(),MG+75,y+4.5);
+    doc.setTextColor(16,185,129);
+    doc.text('Pending',PW-MG-4,y+4.5,{align:'right'});
+    y+=rH;
+  }
+  y+=10;
+  if(y>272){doc.addPage();y=15;}
+
+  // ── FOOTER ──
+  doc.setFillColor(245,242,255);
+  doc.roundedRect(MG,y,PW-MG*2,18,3,3,'F');
+  doc.setFillColor(124,58,237);doc.roundedRect(MG,y,4,18,2,2,'F');
+  doc.setTextColor(124,58,237);doc.setFontSize(8);doc.setFont('helvetica','bold');
+  doc.text('Terms & Conditions',MG+8,y+6);
+  doc.setTextColor(99,95,105);doc.setFont('helvetica','normal');doc.setFontSize(7.5);
+  doc.text('Late payments may incur additional charges. This is a system-generated invoice.',MG+8,y+12);
+  doc.text('All prices in PKR. For queries please contact the shop directly.',MG+8,y+17);
+
+  doc.save('Invoice_'+model.replace(/\s+/g,'_').substring(0,25)+'.pdf');
+  toast(lang==='ur'?'PDF محفوظ ہو گئی':'PDF saved!');
+}
+</script>
+</body>
+</html>
