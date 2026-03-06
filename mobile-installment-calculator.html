@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Mobile Installment Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root {
+  --canvas: #F4F1FA;
+  --fg: #332F3A;
+  --muted: #635F69;
+  --accent: #7C3AED;
+  --accent2: #DB2777;
+  --green: #10B981;
+  --amber: #F59E0B;
+  --red: #EF4444;
+  --card: rgba(255,255,255,0.75);
+  --s-deep: 30px 30px 60px #cdc6d9, -30px -30px 60px #ffffff, inset 10px 10px 20px rgba(139,92,246,0.05), inset -10px -10px 20px rgba(255,255,255,0.8);
+  --s-card: 16px 16px 32px rgba(160,150,180,0.2), -10px -10px 24px rgba(255,255,255,0.9), inset 6px 6px 12px rgba(139,92,246,0.03), inset -6px -6px 12px rgba(255,255,255,1);
+  --s-btn: 10px 10px 20px rgba(139,92,246,0.35), -6px -6px 14px rgba(255,255,255,0.5), inset 3px 3px 6px rgba(255,255,255,0.4), inset -3px -3px 6px rgba(0,0,0,0.12);
+  --s-in: inset 8px 8px 16px #d9d4e3, inset -8px -8px 16px #ffffff;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--canvas);color:var(--fg);min-height:100vh;overflow-x:hidden;}
+
+/* BLOBS */
+.blobs{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;}
+.blob{position:absolute;border-radius:50%;filter:blur(72px);}
+.b1{width:55vw;height:55vw;background:#8B5CF6;opacity:.1;top:-12%;left:-8%;animation:bf1 11s ease-in-out infinite;}
+.b2{width:45vw;height:45vw;background:#EC4899;opacity:.09;top:25%;right:-12%;animation:bf2 13s ease-in-out infinite;}
+.b3{width:38vw;height:38vw;background:#0EA5E9;opacity:.08;bottom:-8%;left:28%;animation:bf1 9s ease-in-out infinite 2.5s;}
+.b4{width:30vw;height:30vw;background:#10B981;opacity:.07;top:55%;left:-5%;animation:bf2 15s ease-in-out infinite 1s;}
+@keyframes bf1{0%,100%{transform:translateY(0) rotate(0deg);}50%{transform:translateY(-22px) rotate(3deg);}}
+@keyframes bf2{0%,100%{transform:translateY(0) rotate(0deg);}50%{transform:translateY(-16px) rotate(-2deg);}}
+@keyframes breathe{0%,100%{transform:scale(1);}50%{transform:scale(1.025);}}
+@keyframes slideUp{from{opacity:0;transform:translateY(28px);}to{opacity:1;transform:translateY(0);}}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* LAYOUT */
+.wrap{position:relative;z-index:1;max-width:700px;margin:0 auto;padding:20px 14px 70px;}
+
+/* STEP INDICATOR */
+.steps{display:flex;align-items:center;justify-content:center;margin-bottom:24px;}
+.step{display:flex;flex-direction:column;align-items:center;gap:4px;font-family:'Nunito',sans-serif;font-size:11px;font-weight:700;color:var(--muted);flex:1;max-width:90px;}
+.step-dot{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;background:#EFEBF5;box-shadow:var(--s-in);color:var(--muted);transition:all .4s ease;font-family:'Nunito',sans-serif;}
+.step.done .step-dot,.step.active .step-dot{background:linear-gradient(135deg,#A78BFA,#7C3AED);box-shadow:var(--s-btn);color:#fff;}
+.step.active .step-dot{animation:breathe 3s ease-in-out infinite;}
+.step-line{flex:1;height:3px;background:#EFEBF5;box-shadow:inset 2px 2px 4px #d9d4e3,inset -2px -2px 4px #fff;border-radius:50px;margin-top:-18px;max-width:40px;transition:background .4s ease;}
+.step-line.done{background:linear-gradient(90deg,#A78BFA,#7C3AED);}
+
+/* HEADER */
+.header-card{background:var(--card);backdrop-filter:blur(24px);border-radius:44px;box-shadow:var(--s-deep);padding:28px 24px 24px;margin-bottom:20px;text-align:center;}
+.logo-section{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:18px;}
+.logo-ring{position:relative;width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,#A78BFA,#7C3AED);box-shadow:var(--s-btn);cursor:pointer;transition:all .3s ease;animation:breathe 7s ease-in-out infinite;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+.logo-ring:hover{transform:translateY(-4px) scale(1.06);}
+.logo-ring:active{transform:scale(0.93);box-shadow:var(--s-in);}
+.logo-ring img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:none;position:absolute;inset:0;}
+.logo-ring .icon-wrap{display:flex;flex-direction:column;align-items:center;color:#fff;font-size:26px;gap:3px;z-index:1;}
+.logo-ring .icon-wrap small{font-size:9px;font-family:'Nunito',sans-serif;font-weight:700;opacity:.9;}
+.shop-name-display{font-family:'Nunito',sans-serif;font-size:clamp(18px,4.5vw,28px);font-weight:900;background:linear-gradient(135deg,var(--fg) 20%,var(--accent) 80%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;min-height:1.4em;}
+.fields-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+.fields-grid .span2{grid-column:1/-1;}
+
+/* CARD */
+.card{background:var(--card);backdrop-filter:blur(24px);border-radius:32px;box-shadow:var(--s-card);padding:24px 20px;margin-bottom:18px;transition:transform .4s ease,box-shadow .4s ease;}
+.card:hover{transform:translateY(-3px);box-shadow:20px 20px 40px rgba(160,150,180,0.25),-12px -12px 28px rgba(255,255,255,0.95),inset 6px 6px 12px rgba(139,92,246,0.04),inset -6px -6px 12px rgba(255,255,255,1);}
+.card-title{font-family:'Nunito',sans-serif;font-size:17px;font-weight:800;color:var(--accent);margin-bottom:16px;display:flex;align-items:center;gap:10px;}
+.ctag{width:34px;height:34px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+
+/* INPUTS */
+.ig{margin-bottom:13px;}
+.lbl{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;letter-spacing:.4px;text-transform:uppercase;}
+.err{font-size:11px;color:var(--red);font-weight:600;margin-top:4px;display:none;}
+.err.show{display:block;}
+input[type=text],input[type=number],input[type=tel]{width:100%;background:#EFEBF5;border:2px solid transparent;border-radius:18px;padding:13px 16px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;color:var(--fg);box-shadow:var(--s-in);outline:none;transition:all .3s ease;-webkit-appearance:none;appearance:none;}
+input:focus{background:#fff;box-shadow:0 0 0 3px rgba(124,58,237,.15),var(--s-card);border-color:rgba(124,58,237,.25);}
+input.invalid{border-color:var(--red)!important;box-shadow:0 0 0 3px rgba(239,68,68,.1)!important;}
+input::placeholder{color:#A09DB0;}
+
+/* PILLS */
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:5px;}
+.pill{padding:9px 16px;border-radius:50px;font-family:'Nunito',sans-serif;font-weight:700;font-size:13px;cursor:pointer;border:none;background:#EFEBF5;box-shadow:var(--s-in);color:var(--muted);transition:all .25s ease;-webkit-tap-highlight-color:transparent;}
+.pill:hover{transform:translateY(-2px);box-shadow:var(--s-card);}
+.pill.active{background:linear-gradient(135deg,#A78BFA,#7C3AED);color:#fff;box-shadow:var(--s-btn);transform:translateY(-2px);}
+.pill:active{transform:scale(0.91);}
+.custom-in{margin-top:10px;display:none;}
+.custom-in.show{display:block;}
+
+/* TOGGLE */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;}
+.tl-main{font-size:14px;font-weight:600;}
+.tl-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.tog{position:relative;width:52px;height:27px;flex-shrink:0;}
+.tog input{opacity:0;width:0;height:0;position:absolute;}
+.tog-track{position:absolute;inset:0;border-radius:50px;cursor:pointer;background:#EFEBF5;box-shadow:var(--s-in);transition:all .35s ease;}
+.tog input:checked+.tog-track{background:linear-gradient(135deg,#A78BFA,#7C3AED);box-shadow:var(--s-btn);}
+.tog-track::after{content:'';position:absolute;top:4px;left:4px;width:19px;height:19px;background:#fff;border-radius:50%;box-shadow:2px 2px 5px rgba(0,0,0,.15);transition:transform .35s cubic-bezier(.34,1.56,.64,1);}
+.tog input:checked+.tog-track::after{transform:translateX(25px);}
+.markup-fields{display:none;margin-top:10px;padding-top:10px;border-top:1px solid rgba(124,58,237,.08);}
+.markup-fields.show{display:block;}
+
+/* MONTH SLIDER */
+.month-box{background:linear-gradient(135deg,rgba(167,139,250,.12),rgba(124,58,237,.06));border-radius:24px;padding:18px 16px 14px;margin-top:6px;}
+.month-num{font-family:'Nunito',sans-serif;font-size:48px;font-weight:900;color:var(--accent);text-align:center;line-height:1;}
+.month-num span{font-size:16px;font-weight:700;color:var(--muted);margin-left:4px;}
+.month-quick{display:flex;justify-content:space-between;gap:5px;margin:10px 0;}
+.mq{flex:1;padding:7px 0;border-radius:50px;border:none;cursor:pointer;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;background:#EFEBF5;box-shadow:var(--s-in);color:var(--muted);transition:all .2s ease;-webkit-tap-highlight-color:transparent;}
+.mq:hover{transform:translateY(-1px);}
+.mq.active{background:linear-gradient(135deg,#A78BFA,#7C3AED);color:#fff;box-shadow:var(--s-btn);}
+.mq:active{transform:scale(0.9);}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:7px;background:linear-gradient(90deg,var(--accent) var(--pct,21%),#EFEBF5 var(--pct,21%));border-radius:50px;box-shadow:var(--s-in);outline:none;cursor:pointer;margin-top:10px;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;background:linear-gradient(135deg,#A78BFA,#7C3AED);border-radius:50%;box-shadow:var(--s-btn);cursor:pointer;transition:transform .2s ease;}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.2);}
+input[type=range]::-moz-range-thumb{width:26px;height:26px;border:none;background:linear-gradient(135deg,#A78BFA,#7C3AED);border-radius:50%;box-shadow:var(--s-btn);cursor:pointer;}
+
+/* CALC BUTTON */
+.calc-btn{width:100%;padding:17px;border-radius:22px;border:none;background:linear-gradient(135deg,#A78BFA,#7C3AED);color:#fff;font-family:'Nunito',sans-serif;font-size:18px;font-weight:900;letter-spacing:.3px;box-shadow:var(--s-btn);cursor:pointer;transition:all .25s ease;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent;}
+.calc-btn:hover{transform:translateY(-3px);box-shadow:14px 14px 28px rgba(139,92,246,.4),-8px -8px 18px rgba(255,255,255,.5),inset 3px 3px 6px rgba(255,255,255,.4),inset -3px -3px 6px rgba(0,0,0,.12);}
+.calc-btn:active{transform:scale(0.92);box-shadow:var(--s-in);}
+.spinner{width:20px;height:20px;border:3px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none;}
+
+/* DIVIDER */
+.div{height:2px;background:linear-gradient(90deg,transparent,rgba(124,58,237,.1),transparent);margin:13px 0;border-radius:50px;}
+
+/* RESULTS */
+.results{display:none;background:linear-gradient(145deg,rgba(167,139,250,.12),rgba(236,72,153,.06),rgba(14,165,233,.05));backdrop-filter:blur(24px);border-radius:40px;box-shadow:var(--s-deep);padding:28px 20px;margin-bottom:18px;}
+.results.show{display:block;animation:slideUp .5s cubic-bezier(.34,1.3,.64,1);}
+.res-title{font-family:'Nunito',sans-serif;font-size:20px;font-weight:900;color:var(--accent);text-align:center;margin-bottom:20px;}
+.orbs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;}
+.orb{background:var(--card);border-radius:24px;box-shadow:var(--s-card);padding:16px 12px;text-align:center;transition:all .3s ease;animation:breathe 7s ease-in-out infinite;}
+.orb:hover{transform:translateY(-3px) scale(1.03);}
+.orb.big{grid-column:1/-1;background:linear-gradient(135deg,#A78BFA,#7C3AED);animation:breathe 4s ease-in-out infinite;}
+.orb-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;}
+.orb.big .orb-lbl{color:rgba(255,255,255,.8);}
+.orb-val{font-family:'Nunito',sans-serif;font-size:22px;font-weight:900;color:var(--accent);}
+.orb.big .orb-val{color:#fff;font-size:30px;}
+.orb-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+.orb.big .orb-sub{color:rgba(255,255,255,.75);}
+
+/* SCHEDULE */
+.sched-wrap{background:var(--card);border-radius:22px;box-shadow:var(--s-card);overflow:hidden;margin-top:14px;}
+.sched-head{font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;color:var(--accent);padding:14px 16px 10px;border-bottom:2px solid rgba(124,58,237,.08);}
+.sched-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+table{width:100%;border-collapse:collapse;min-width:320px;}
+thead tr{background:rgba(124,58,237,.06);}
+th{padding:9px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;}
+td{padding:10px 12px;font-size:13px;font-weight:500;border-bottom:1px solid rgba(124,58,237,.05);color:var(--fg);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(124,58,237,.03);}
+.badge{display:inline-block;padding:3px 9px;border-radius:50px;font-size:10px;font-weight:700;background:rgba(16,185,129,.1);color:var(--green);}
+
+/* PDF BUTTON */
+.pdf-btn{width:100%;padding:15px;margin-top:14px;border-radius:22px;border:2.5px solid rgba(124,58,237,.25);background:transparent;color:var(--accent);font-family:'Nunito',sans-serif;font-size:16px;font-weight:800;cursor:pointer;transition:all .25s ease;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent;}
+.pdf-btn:hover{background:rgba(124,58,237,.07);border-color:var(--accent);transform:translateY(-2px);box-shadow:var(--s-card);}
+.pdf-btn:active{transform:scale(0.92);}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--fg);color:#fff;padding:12px 22px;border-radius:50px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;box-shadow:0 8px 32px rgba(0,0,0,.25);z-index:999;transition:transform .4s cubic-bezier(.34,1.3,.64,1),opacity .4s ease;opacity:0;white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+
+/* RESPONSIVE */
+@media(max-width:480px){
+  .fields-grid{grid-template-columns:1fr;}
+  .header-card{padding:22px 16px 20px;border-radius:36px;}
+  .card{padding:20px 16px;border-radius:28px;}
+  .month-num{font-size:40px;}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+</style>
+</head>
+<body>
+
+<div class="blobs">
+  <div class="blob b1"></div><div class="blob b2"></div>
+  <div class="blob b3"></div><div class="blob b4"></div>
+</div>
+
+<div class="wrap">
+
+  <!-- STEPS -->
+  <div class="steps">
+    <div class="step active" id="s1"><div class="step-dot">1</div><span>Shop</span></div>
+    <div class="step-line" id="sl1"></div>
+    <div class="step" id="s2"><div class="step-dot">2</div><span>Mobile</span></div>
+    <div class="step-line" id="sl2"></div>
+    <div class="step" id="s3"><div class="step-dot">3</div><span>Plan</span></div>
+    <div class="step-line" id="sl3"></div>
+    <div class="step" id="s4"><div class="step-dot">4</div><span>Result</span></div>
+  </div>
+
+  <!-- SHOP HEADER -->
+  <div class="header-card">
+    <div class="logo-section">
+      <div class="logo-ring" id="logoRing" onclick="document.getElementById('logoInput').click()">
+        <div class="icon-wrap" id="iconWrap">
+          <span>🏪</span>
+          <small>Add Logo</small>
+        </div>
+        <img id="logoImg" alt="Shop Logo">
+        <input type="file" id="logoInput" accept="image/*" style="display:none" onchange="handleLogo(event)">
+      </div>
+    </div>
+    <div class="shop-name-display" id="shopDisplay">Mobile Installment Calculator</div>
+    <div class="fields-grid">
+      <div class="ig span2">
+        <label class="lbl">Shop Name</label>
+        <input type="text" id="shopName" placeholder="e.g. Star Mobile Center" oninput="updateDisplay()">
+      </div>
+      <div class="ig">
+        <label class="lbl">Address</label>
+        <input type="text" id="shopAddr" placeholder="Shop address">
+      </div>
+      <div class="ig">
+        <label class="lbl">Phone</label>
+        <input type="tel" id="shopPhone" placeholder="+92 300 0000000">
+      </div>
+    </div>
+  </div>
+
+  <!-- MOBILE DETAILS -->
+  <div class="card">
+    <div class="card-title">
+      <div class="ctag" style="background:linear-gradient(135deg,#60A5FA,#3B82F6)">📱</div>
+      Mobile Details
+    </div>
+    <div class="ig">
+      <label class="lbl">Mobile Model</label>
+      <input type="text" id="mobileModel" placeholder="e.g. Samsung Galaxy A55">
+    </div>
+    <div class="ig">
+      <label class="lbl">Mobile Price (PKR)</label>
+      <input type="number" id="mobilePrice" placeholder="e.g. 65000" min="0" oninput="clearErr('mobilePrice','priceErr')">
+      <div class="err" id="priceErr">Please enter a valid mobile price</div>
+    </div>
+    <div class="ig">
+      <label class="lbl">Profit Margin</label>
+      <div class="pills">
+        <button class="pill active" onclick="setMargin(15,this)">15%</button>
+        <button class="pill" onclick="setMargin(20,this)">20%</button>
+        <button class="pill" onclick="setMargin(25,this)">25%</button>
+        <button class="pill" onclick="setMargin('c',this)">Custom</button>
+      </div>
+      <div class="custom-in" id="custIn">
+        <input type="number" id="custMargin" placeholder="Enter % e.g. 18" min="0.1" max="200" style="margin-top:8px" oninput="clearErr('custMargin','marginErr')">
+        <div class="err" id="marginErr">Enter a valid margin %</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INSTALLMENT PLAN -->
+  <div class="card">
+    <div class="card-title">
+      <div class="ctag" style="background:linear-gradient(135deg,#F472B6,#EC4899)">⚙️</div>
+      Installment Plan
+    </div>
+    <div class="ig">
+      <label class="lbl">Down Payment (PKR)</label>
+      <input type="number" id="downPay" placeholder="0 (optional)" min="0" oninput="clearErr('downPay','downErr')">
+      <div class="err" id="downErr">Down payment cannot exceed total price</div>
+    </div>
+    <div class="div"></div>
+    <div class="toggle-row">
+      <div>
+        <div class="tl-main">Add Markup / Interest</div>
+        <div class="tl-sub">Monthly charge on remaining balance</div>
+      </div>
+      <label class="tog">
+        <input type="checkbox" id="markupTog" onchange="toggleMarkup()">
+        <div class="tog-track"></div>
+      </label>
+    </div>
+    <div class="markup-fields" id="markupFields">
+      <div class="ig">
+        <label class="lbl">Markup Rate (% per month)</label>
+        <input type="number" id="markupRate" placeholder="e.g. 2.5" min="0.1" max="50" step="0.1" value="2" oninput="clearErr('markupRate','markupErr')">
+        <div class="err" id="markupErr">Enter a valid rate between 0.1 and 50</div>
+      </div>
+    </div>
+    <div class="div"></div>
+    <div class="ig">
+      <label class="lbl">Installment Duration</label>
+      <div class="month-box">
+        <div class="month-num" id="monthNum">6 <span>months</span></div>
+        <div class="month-quick">
+          <button class="mq" onclick="setMonths(3,this)">3</button>
+          <button class="mq active" onclick="setMonths(6,this)">6</button>
+          <button class="mq" onclick="setMonths(12,this)">12</button>
+          <button class="mq" onclick="setMonths(18,this)">18</button>
+          <button class="mq" onclick="setMonths(24,this)">24</button>
+        </div>
+        <input type="range" id="monthRange" min="1" max="24" value="6" oninput="onSlider(this)">
+      </div>
+    </div>
+  </div>
+
+  <!-- CALCULATE -->
+  <button class="calc-btn" id="calcBtn" onclick="calculate()">
+    <span id="btnTxt">Calculate Installments</span>
+    <div class="spinner" id="btnSpin"></div>
+  </button>
+
+  <!-- RESULTS -->
+  <div class="results" id="results">
+    <div class="res-title">Installment Breakdown</div>
+    <div class="orbs">
+      <div class="orb big">
+        <div class="orb-lbl">Monthly Installment</div>
+        <div class="orb-val" id="r-monthly">—</div>
+        <div class="orb-sub" id="r-msub">per month</div>
+      </div>
+      <div class="orb" style="animation-delay:.4s">
+        <div class="orb-lbl">Original Price</div>
+        <div class="orb-val" id="r-price" style="font-size:17px">—</div>
+        <div class="orb-sub">mobile cost</div>
+      </div>
+      <div class="orb" style="animation-delay:.8s">
+        <div class="orb-lbl">Profit Added</div>
+        <div class="orb-val" id="r-profit" style="font-size:17px">—</div>
+        <div class="orb-sub" id="r-msub2">—</div>
+      </div>
+      <div class="orb" style="animation-delay:1.2s">
+        <div class="orb-lbl">Down Payment</div>
+        <div class="orb-val" id="r-down" style="font-size:17px">—</div>
+        <div class="orb-sub">paid upfront</div>
+      </div>
+      <div class="orb" style="animation-delay:1.6s">
+        <div class="orb-lbl">Markup / Interest</div>
+        <div class="orb-val" id="r-markup" style="font-size:17px">—</div>
+        <div class="orb-sub" id="r-msub3">—</div>
+      </div>
+      <div class="orb" style="background:linear-gradient(135deg,rgba(16,185,129,.1),rgba(16,185,129,.05));animation-delay:2s">
+        <div class="orb-lbl">Total Payable</div>
+        <div class="orb-val" id="r-total" style="font-size:17px;color:var(--green)">—</div>
+        <div class="orb-sub">complete amount</div>
+      </div>
+    </div>
+    <div class="sched-wrap">
+      <div class="sched-head">Monthly Payment Schedule</div>
+      <div class="sched-scroll">
+        <table>
+          <thead><tr><th>#</th><th>Month</th><th>Amount (PKR)</th><th>Status</th></tr></thead>
+          <tbody id="schedBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <button class="pdf-btn" onclick="downloadPDF()">Download Invoice as PDF</button>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// STATE
+let margin = 15, customMode = false, months = 6, logoData = null, calc = null;
+
+// LOGO
+function handleLogo(e){
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    logoData = ev.target.result;
+    const img = document.getElementById('logoImg');
+    img.src = logoData; img.style.display='block';
+    document.getElementById('iconWrap').style.display='none';
+  };
+  r.readAsDataURL(f);
+}
+
+function updateDisplay(){
+  const v = document.getElementById('shopName').value.trim();
+  document.getElementById('shopDisplay').textContent = v || 'Mobile Installment Calculator';
+}
+
+// MARGIN
+function setMargin(v, el){
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  const ci = document.getElementById('custIn');
+  if(v==='c'){ customMode=true; ci.classList.add('show'); margin=null; }
+  else { customMode=false; ci.classList.remove('show'); margin=v; }
+}
+
+// TOGGLE
+function toggleMarkup(){
+  const on = document.getElementById('markupTog').checked;
+  document.getElementById('markupFields').classList.toggle('show', on);
+}
+
+// MONTHS
+function setMonths(v, el){
+  months = v;
+  document.getElementById('monthRange').value = v;
+  document.getElementById('monthNum').innerHTML = `${v} <span>months</span>`;
+  document.querySelectorAll('.mq').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  updateSlider(v);
+}
+
+function onSlider(el){
+  const v = parseInt(el.value); months = v;
+  document.getElementById('monthNum').innerHTML = `${v} <span>months</span>`;
+  document.querySelectorAll('.mq').forEach(b => b.classList.toggle('active', parseInt(b.textContent)==v));
+  updateSlider(v);
+}
+
+function updateSlider(v){
+  const pct = ((v-1)/23*100).toFixed(1)+'%';
+  document.getElementById('monthRange').style.setProperty('--pct', pct);
+}
+
+// ERRORS
+function clearErr(inputId, errId){
+  document.getElementById(inputId).classList.remove('invalid');
+  document.getElementById(errId).classList.remove('show');
+}
+function showErr(inputId, errId){
+  document.getElementById(inputId).classList.add('invalid');
+  document.getElementById(errId).classList.add('show');
+}
+
+// TOAST
+function toast(msg, dur=2800){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+// STEPS
+function activateStep(n){
+  for(let i=1;i<=4;i++){
+    const s=document.getElementById('s'+i);
+    s.classList.remove('active','done');
+    if(i<n){ s.classList.add('done'); const l=document.getElementById('sl'+i); if(l) l.classList.add('done'); }
+  }
+  document.getElementById('s'+n).classList.add('active');
+}
+
+// FORMAT
+function fmt(n){ return 'Rs. '+Math.round(n).toLocaleString('en-US'); }
+
+// CALCULATE
+function calculate(){
+  let ok = true;
+
+  const price = parseFloat(document.getElementById('mobilePrice').value);
+  if(!price || price<=0){ showErr('mobilePrice','priceErr'); ok=false; } else clearErr('mobilePrice','priceErr');
+
+  let m = margin;
+  if(customMode){
+    m = parseFloat(document.getElementById('custMargin').value);
+    if(!m||m<=0){ showErr('custMargin','marginErr'); ok=false; } else clearErr('custMargin','marginErr');
+  }
+
+  const down = parseFloat(document.getElementById('downPay').value)||0;
+  if(down<0){ showErr('downPay','downErr'); ok=false; } else clearErr('downPay','downErr');
+
+  const markupOn = document.getElementById('markupTog').checked;
+  const markupRate = parseFloat(document.getElementById('markupRate').value)||0;
+  if(markupOn&&(markupRate<=0||markupRate>50)){ showErr('markupRate','markupErr'); ok=false; } else clearErr('markupRate','markupErr');
+
+  if(!ok){ toast('Fix the errors first '); return; }
+
+  // loading
+  document.getElementById('btnTxt').style.display='none';
+  document.getElementById('btnSpin').style.display='block';
+  document.getElementById('calcBtn').disabled=true;
+
+  setTimeout(()=>{
+    const profit = price*(m/100);
+    const withProfit = price+profit;
+
+    if(down>=withProfit){
+      toast('Down payment covers full amount — no installments needed!');
+      document.getElementById('btnTxt').style.display='inline';
+      document.getElementById('btnSpin').style.display='none';
+      document.getElementById('calcBtn').disabled=false;
+      return;
+    }
+
+    const remaining = withProfit-down;
+    let totalMarkup=0, monthly=remaining/months;
+    if(markupOn&&markupRate>0){
+      totalMarkup = remaining*(markupRate/100)*months;
+      monthly = (remaining+totalMarkup)/months;
+    }
+    const total = down+(monthly*months);
+
+    calc={price,profit,withProfit,down,months,monthly,totalMarkup,total,margin:m,markupRate,markupOn};
+
+    document.getElementById('r-price').textContent = fmt(price);
+    document.getElementById('r-profit').textContent = fmt(profit);
+    document.getElementById('r-msub2').textContent = m+'% margin';
+    document.getElementById('r-down').textContent = fmt(down);
+    document.getElementById('r-markup').textContent = markupOn?fmt(totalMarkup):'None';
+    document.getElementById('r-msub3').textContent = markupOn?markupRate+'%/month':'disabled';
+    document.getElementById('r-total').textContent = fmt(total);
+    document.getElementById('r-monthly').textContent = fmt(monthly);
+    document.getElementById('r-msub').textContent = 'for '+months+' month'+(months>1?'s':'');
+
+    const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const now=new Date(); let rows='';
+    for(let i=1;i<=months;i++){
+      const d=new Date(now.getFullYear(),now.getMonth()+i,1);
+      rows+=`<tr><td><strong>${i}</strong></td><td>${MN[d.getMonth()]} ${d.getFullYear()}</td><td><strong>${fmt(monthly)}</strong></td><td><span class="badge">Pending</span></td></tr>`;
+    }
+    document.getElementById('schedBody').innerHTML=rows;
+
+    const res=document.getElementById('results');
+    res.classList.add('show');
+    setTimeout(()=>res.scrollIntoView({behavior:'smooth',block:'start'}),150);
+    activateStep(4);
+    toast('Done! Scroll down for results');
+
+    document.getElementById('btnTxt').style.display='inline';
+    document.getElementById('btnSpin').style.display='none';
+    document.getElementById('calcBtn').disabled=false;
+  },700);
+}
+
+// PDF
+function downloadPDF(){
+  if(!calc){ toast('Calculate first!'); return; }
+  toast('Generating PDF...');
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const PW=210,MG=16; let y=0;
+
+  // Header bg
+  doc.setFillColor(124,58,237); doc.rect(0,0,PW,48,'F');
+  doc.setFillColor(167,139,250,0.3); doc.circle(PW-20,48,25,'F');
+  doc.setFillColor(219,39,119,0.4); doc.circle(PW,5,18,'F');
+
+  // Logo circle
+  doc.setFillColor(255,255,255);
+  doc.circle(MG+14,24,13,'F');
+  if(logoData){
+    try{ doc.addImage(logoData,'JPEG',MG+1,11,26,26,'','FAST'); }
+    catch(e){ doc.setTextColor(124,58,237); doc.setFontSize(14); doc.setFont('helvetica','bold'); doc.text('M',MG+10,28); }
+  } else {
+    doc.setTextColor(124,58,237); doc.setFontSize(14); doc.setFont('helvetica','bold'); doc.text('M',MG+10,28);
+  }
+
+  const sn=document.getElementById('shopName').value||'Mobile Shop';
+  const sa=document.getElementById('shopAddr').value||'';
+  const sp=document.getElementById('shopPhone').value||'';
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(14); doc.setFont('helvetica','bold');
+  doc.text(sn.substring(0,32),MG+32,16);
+  doc.setFontSize(8.5); doc.setFont('helvetica','normal');
+  if(sa) doc.text(sa.substring(0,45),MG+32,24);
+  if(sp) doc.text(sp,MG+32,31);
+
+  const invNo='#'+Math.floor(10000+Math.random()*90000);
+  const dt=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  doc.setFontSize(9); doc.setFont('helvetica','bold');
+  doc.text('INVOICE '+invNo,PW-MG-32,16);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  doc.text(dt,PW-MG-20,24);
+
+  y=56;
+
+  // Mobile info box
+  const model=document.getElementById('mobileModel').value||'Mobile Device';
+  doc.setFillColor(245,242,255);
+  doc.roundedRect(MG,y,PW-MG*2,22,3,3,'F');
+  doc.setTextColor(124,58,237); doc.setFontSize(11); doc.setFont('helvetica','bold');
+  doc.text(model.substring(0,38),MG+5,y+9);
+  doc.setTextColor(99,95,105); doc.setFontSize(8); doc.setFont('helvetica','normal');
+  doc.text('Price: Rs.'+Math.round(calc.price).toLocaleString(),MG+5,y+17);
+  doc.text('Margin: '+calc.margin+'%',MG+65,y+17);
+  doc.text('Duration: '+calc.months+' months',MG+108,y+17);
+  y+=28;
+
+  // Summary table
+  const rows=[
+    ['Mobile Price','Rs.'+Math.round(calc.price).toLocaleString()],
+    ['Profit ('+calc.margin+'%)','Rs.'+Math.round(calc.profit).toLocaleString()],
+    ['Price with Profit','Rs.'+Math.round(calc.withProfit).toLocaleString()],
+    ['Down Payment','Rs.'+Math.round(calc.down).toLocaleString()],
+    ['Remaining Balance','Rs.'+Math.round(calc.withProfit-calc.down).toLocaleString()],
+    ['Markup/Interest',calc.markupOn?'Rs.'+Math.round(calc.totalMarkup).toLocaleString()+' ('+calc.markupRate+'%/mo)':'None'],
+    ['Duration',calc.months+' Months'],
+    ['Monthly Payment','Rs.'+Math.round(calc.monthly).toLocaleString()],
+    ['TOTAL PAYABLE','Rs.'+Math.round(calc.total).toLocaleString()],
+  ];
+
+  doc.setFillColor(124,58,237);
+  doc.roundedRect(MG,y,PW-MG*2,8,2,2,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(8.5); doc.setFont('helvetica','bold');
+  doc.text('Description',MG+4,y+5.5);
+  doc.text('Amount',PW-MG-4,y+5.5,{align:'right'});
+  y+=9;
+
+  rows.forEach((r,i)=>{
+    const last=i===rows.length-1;
+    if(last){ doc.setFillColor(124,58,237); doc.roundedRect(MG,y-0.5,PW-MG*2,9,2,2,'F'); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); }
+    else { doc.setFillColor(i%2===0?248:255,i%2===0?246:255,255); doc.rect(MG,y-0.5,PW-MG*2,8.5,'F'); doc.setTextColor(51,47,58); doc.setFont('helvetica',i===rows.length-2?'bold':'normal'); }
+    doc.setFontSize(8.5);
+    doc.text(r[0],MG+4,y+5.5);
+    doc.text(r[1],PW-MG-4,y+5.5,{align:'right'});
+    y+=9;
+  });
+  y+=8;
+
+  // Schedule — new page if needed
+  const rH=7.5;
+  if(y+10+calc.months*rH>275){ doc.addPage(); y=15; }
+
+  doc.setFillColor(124,58,237);
+  doc.roundedRect(MG,y,PW-MG*2,8,2,2,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(8.5); doc.setFont('helvetica','bold');
+  doc.text('#',MG+4,y+5.5);
+  doc.text('Due Month',MG+16,y+5.5);
+  doc.text('Amount (PKR)',MG+75,y+5.5);
+  doc.text('Status',PW-MG-4,y+5.5,{align:'right'});
+  y+=9;
+
+  const MNS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const nd=new Date();
+  for(let i=1;i<=calc.months;i++){
+    if(y+rH>285){ doc.addPage(); y=15; }
+    const dd=new Date(nd.getFullYear(),nd.getMonth()+i,1);
+    doc.setFillColor(i%2===0?248:255,i%2===0?246:255,255);
+    doc.rect(MG,y-0.5,PW-MG*2,rH,'F');
+    doc.setTextColor(51,47,58); doc.setFontSize(8); doc.setFont('helvetica','normal');
+    doc.text(String(i),MG+4,y+4.5);
+    doc.text(MNS[dd.getMonth()]+' '+dd.getFullYear(),MG+12,y+4.5);
+    doc.text('Rs.'+Math.round(calc.monthly).toLocaleString(),MG+75,y+4.5);
+    doc.setTextColor(16,185,129);
+    doc.text('Pending',PW-MG-4,y+4.5,{align:'right'});
+    y+=rH;
+  }
+  y+=8;
+  if(y>272){ doc.addPage(); y=15; }
+
+  // Footer
+  doc.setFillColor(245,242,255);
+  doc.roundedRect(MG,y,PW-MG*2,16,3,3,'F');
+  doc.setTextColor(124,58,237); doc.setFontSize(8); doc.setFont('helvetica','bold');
+  doc.text('Note:',MG+5,y+6);
+  doc.setTextColor(99,95,105); doc.setFont('helvetica','normal');
+  doc.text('Late payments may incur additional charges. Computer-generated invoice.',MG+16,y+6);
+  doc.text('Prices in Pakistani Rupees (PKR). Contact shop for queries.',MG+5,y+12);
+
+  doc.save('Invoice_'+model.replace(/\s+/g,'_').substring(0,25)+'.pdf');
+  toast('PDF saved successfully!');
+}
+</script>
+</body>
+</html>
